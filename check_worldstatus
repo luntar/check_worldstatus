@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# This script checks the Final Fantasy XIV world-status server for a given "world's"
+# availability.  The script will first ensure that the given world name's status
+# is reported.  It will then repatable check the status, loging the outcome
+#
+# Useage:
+#
+# ./check_worldstatus <server_name>
+#
+# example:
+#
+# ./check_worldstatus Midgardsormr
+#
+
+
+# --- SCRIPT CONFIGURATION ---
+#
+QUERY_INTERVAL=2
+LOG_NAME=worldstatus.log
+WORLD_STATUS_URL=https://na.finalfantasyxiv.com/lodestone/worldstatus/
+
+# --- SCRIPT FUNCTIONS ---
+#
+
+# log <args...> will output the given text into the scripts log
+function log {
+    local msg=$*
+    echo $WORLD_NAME : $(date) : $(date '+%s'), $msg >> $LOG_NAME
+}
+
+# verifWorldName - query the server, verify that the given name exists
+#                  if this fails, the scrip wille exit.
+function verifyWorldName {
+    echo verifying world name....
+    curl -s $WORLD_STATUS_URL | grep $1 -A 10 > .chk_arg
+    local outcome=$(cat .chk_arg | grep -c Creation)
+    if [ $outcome -eq 0 ]; then
+        echo The world name \"$1\" was not found, verify spelling, retry, f-you
+        exit 1
+    fi
+    echo World name $1 is good
+}
+
+
+#  ----------- START OF MAIN SCRIPT -------------------
+
+# Verify input argument (should only have one)
+if [ $# -ne 1 ];
+then echo "Useage $0 <world_name>"
+    exit 2
+fi
+WORLD_NAME=$1
+
+log "STARTING"
+
+# Verify the world name, if this fails, the script will exit
+verifyWorldName $WORLD_NAME
+
+
+# Main query loop - never exit, just keep logging results
+while [ : ]
+do
+    # convert the  CHK_COUNTER into a time string
+    SECS=$((CHK_COUNTER * $QUERY_INTERVAL))
+    ETIME=$(date -d@$SECS -u '+%H:%M:%S')
+    
+    # Notify what's going on and sleep
+    printf "Elaspsed: %s - checking %s in %d sec " $ETIME $WORLD_NAME $QUERY_INTERVAL
+    sleep $QUERY_INTERVAL
+    
+    # Pull data from web parse out the availability
+    curl -s $WORLD_STATUS_URL | grep $WORLD_NAME -A 10 | grep Creation | awk -F\" '{print $4}' > .chk_txt
+    printf " - ok"
+    
+    # Check for availability
+    WORLD_OPEN=$(cat .chk_txt | grep -c Available)
+    
+    if [ $WORLD_OPEN -eq 1 ]; then
+        # WORLD  is available
+        log AVAILABLE
+        # Attempt to notify user
+        printf "\n"
+        cat get_attention.txt
+        echo Create a new charicter on $WORLD_NAME
+    else
+        # World is NOT available for new characters
+        log NOT AVAILABLE
+        printf " - not available\n"
+    fi
+    
+    CHK_COUNTER=$(( CHK_COUNTER + 1  ))
+done
+
+
