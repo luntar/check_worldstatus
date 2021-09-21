@@ -16,7 +16,7 @@
 
 # --- SCRIPT CONFIGURATION ---
 #
-QUERY_INTERVAL=2
+QUERY_INTERVAL=20
 LOG_NAME=worldstatus.log
 WORLD_STATUS_URL=https://na.finalfantasyxiv.com/lodestone/worldstatus/
 
